@@ -39,11 +39,11 @@
         document.getElementById("status").innerText = "Upload berhasil!";
 
         // update JSON BIN
-        await fetch("https://api.jsonbin.io/v3/b/YOUR_BIN_ID", {
+        await fetch("https://api.jsonbin.io/v3/b/69eef0e636566621a8f672b2", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            "X-Master-Key": "YOUR_JSONBIN_KEY"
+            "X-Master-Key": "$2a$10$U3mesZnW2duGObMUSgs9iukrM.mObpo76RiEk1shKOUyw2z01HSt2"
           },
           body: JSON.stringify({
             image: imageUrl
