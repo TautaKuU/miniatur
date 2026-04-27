@@ -1,58 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Upload ke IoT</title>
+  <title>IoT Image Control</title>
 </head>
 <body>
-  <h2>Upload Gambar ke IoT</h2>
 
-  <input type="file" id="fileInput">
-  <button onclick="upload()">Upload</button>
+<h2>Upload Gambar</h2>
+<input type="file" id="fileInput">
+<button onclick="upload()">Upload</button>
 
-  <p id="status"></p>
+<h3>Gallery</h3>
+<div id="gallery"></div>
 
-  <script>
-    const API_KEY = "b8cfebb199389c2fe459a736e3bd4484";
+<script>
+const API_KEY = "ISI_API_IMGBB_BARU";
+const BIN_ID = "69eef0e636566621a8f672b2";
+const JSON_KEY = "ISI_JSONBIN_KEY_BARU";
 
-    async function upload() {
-      const file = document.getElementById("fileInput").files[0];
-      if (!file) return alert("Pilih file dulu!");
+const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
 
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
+// LOAD DATA
+async function loadImages() {
+  const res = await fetch(BIN_URL);
+  const data = await res.json();
 
-      reader.onload = async () => {
-        const base64 = reader.result.split(',')[1];
+  let record = data.record;
 
-        document.getElementById("status").innerText = "Uploading...";
+  if (!record || !record.images) {
+    record = { current: "", images: [] };
+    await save(record);
+  }
 
-        const res = await fetch("https://api.imgbb.com/1/upload?key=" + API_KEY, {
-          method: "POST",
-          body: new URLSearchParams({
-            image: base64
-          })
-        });
+  displayImages(record.images, record.current);
+}
 
-        const data = await res.json();
-        const imageUrl = data.data.url;
+// TAMPILKAN
+function displayImages(images, current) {
+  const container = document.getElementById("gallery");
+  container.innerHTML = "";
 
-        document.getElementById("status").innerText = "Upload berhasil!";
+  images.forEach((url, index) => {
+    const div = document.createElement("div");
 
-        // update JSON BIN
-        await fetch("https://api.jsonbin.io/v3/b/69eef0e636566621a8f672b2", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Master-Key": "$2a$10$U3mesZnW2duGObMUSgs9iukrM.mObpo76RiEk1shKOUyw2z01HSt2"
-          },
-          body: JSON.stringify({
-            image: imageUrl
-          })
-        });
+    div.innerHTML = `
+      <img src="${url}" width="120"><br>
+      ${url === current ? "<b style='color:green'>AKTIF</b><br>" : ""}
+      <button onclick="setCurrent('${url}')">Tampilkan</button>
+      <button onclick="deleteImage(${index})">Delete</button>
+      <hr>
+    `;
 
-        alert("IoT berhasil diupdate!");
-      };
-    }
-  </script>
+    container.appendChild(div);
+  });
+}
+
+// UPLOAD
+async function upload() {
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) return alert("Pilih file!");
+
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+
+  reader.onload = async () => {
+    const base64 = reader.result.split(',')[1];
+
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+      method: "POST",
+      body: new URLSearchParams({ image: base64 })
+    });
+
+    const data = await res.json();
+    const imageUrl = data.data.url;
+
+    await addImage(imageUrl);
+    loadImages();
+  };
+}
+
+// TAMBAH IMAGE
+async function addImage(url) {
+  const res = await fetch(BIN_URL);
+  const data = await res.json();
+  const record = data.record;
+
+  record.images.push(url);
+
+  if (!record.current) {
+    record.current = url;
+  }
+
+  await save(record);
+}
+
+// SET AKTIF
+async function setCurrent(url) {
+  const res = await fetch(BIN_URL);
+  const data = await res.json();
+  const record = data.record;
+
+  record.current = url;
+
+  await save(record);
+  loadImages();
+}
+
+// DELETE
+async function deleteImage(index) {
+  const res = await fetch(BIN_URL);
+  const data = await res.json();
+  const record = data.record;
+
+  const deletedUrl = record.images[index];
+
+  record.images.splice(index, 1);
+
+  // FIX BUG: cek current dengan benar
+  if (record.current === deletedUrl) {
+    record.current = record.images[0] || "";
+  }
+
+  await save(record);
+  loadImages();
+}
+
+// SAVE
+async function save(record) {
+  await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Master-Key": JSON_KEY
+    },
+    body: JSON.stringify(record)
+  });
+}
+
+window.onload = loadImages;
+</script>
+
 </body>
 </html>
