@@ -9,37 +9,51 @@
 <input type="file" id="fileInput">
 <button onclick="upload()">Upload</button>
 
+<p id="status"></p>
+
 <h3>Gallery</h3>
 <div id="gallery"></div>
 
 <script>
-const API_KEY = "ISI_API_IMGBB_BARU";
+const API_KEY = "b8cfebb199389c2fe459a736e3bd4484";
 const BIN_ID = "69eef0e636566621a8f672b2";
-const JSON_KEY = "ISI_JSONBIN_KEY_BARU";
+const JSON_KEY = "ISI_JSONBIN_KEY_KAMU";
 
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
 
-// LOAD DATA
+// ================= LOAD DATA =================
 async function loadImages() {
-  const res = await fetch(BIN_URL);
-  const data = await res.json();
+  try {
+    const res = await fetch(BIN_URL);
+    const data = await res.json();
 
-  let record = data.record;
+    let record = data.record;
 
-  if (!record || !record.images) {
-    record = { current: "", images: [] };
-    await save(record);
+    if (!record || !record.images) {
+      record = { current: "", images: [] };
+      await save(record);
+    }
+
+    displayImages(record.images, record.current);
+  } catch (err) {
+    console.error(err);
+    document.getElementById("status").innerText = "Gagal load data!";
   }
-
-  displayImages(record.images, record.current);
 }
 
-// TAMPILKAN
+// ================= TAMPILKAN =================
 function displayImages(images, current) {
   const container = document.getElementById("gallery");
   container.innerHTML = "";
 
+  if (images.length === 0) {
+    container.innerHTML = "<p>Belum ada gambar</p>";
+    return;
+  }
+
   images.forEach((url, index) => {
+    if (!url) return; // skip kosong
+
     const div = document.createElement("div");
 
     div.innerHTML = `
@@ -54,31 +68,57 @@ function displayImages(images, current) {
   });
 }
 
-// UPLOAD
+// ================= UPLOAD =================
 async function upload() {
   const file = document.getElementById("fileInput").files[0];
-  if (!file) return alert("Pilih file!");
+  const status = document.getElementById("status");
+
+  if (!file) {
+    alert("Pilih file!");
+    return;
+  }
+
+  status.innerText = "Uploading...";
 
   const reader = new FileReader();
   reader.readAsDataURL(file);
 
   reader.onload = async () => {
-    const base64 = reader.result.split(',')[1];
+    try {
+      const base64 = reader.result.split(',')[1];
 
-    const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
-      method: "POST",
-      body: new URLSearchParams({ image: base64 })
-    });
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+        method: "POST",
+        body: new URLSearchParams({ image: base64 })
+      });
 
-    const data = await res.json();
-    const imageUrl = data.data.url;
+      const data = await res.json();
+      console.log("ImgBB response:", data);
 
-    await addImage(imageUrl);
-    loadImages();
+      if (!data.success) {
+        status.innerText = "Upload gagal!";
+        return;
+      }
+
+      const imageUrl = data.data.url;
+
+      status.innerText = "Menyimpan ke database...";
+
+      await addImage(imageUrl);
+
+      status.innerText = "Upload berhasil!";
+      document.getElementById("fileInput").value = "";
+
+      loadImages();
+
+    } catch (err) {
+      console.error(err);
+      status.innerText = "Terjadi error!";
+    }
   };
 }
 
-// TAMBAH IMAGE
+// ================= TAMBAH IMAGE =================
 async function addImage(url) {
   const res = await fetch(BIN_URL);
   const data = await res.json();
@@ -93,8 +133,11 @@ async function addImage(url) {
   await save(record);
 }
 
-// SET AKTIF
+// ================= SET AKTIF =================
 async function setCurrent(url) {
+  const status = document.getElementById("status");
+  status.innerText = "Mengupdate tampilan...";
+
   const res = await fetch(BIN_URL);
   const data = await res.json();
   const record = data.record;
@@ -102,11 +145,16 @@ async function setCurrent(url) {
   record.current = url;
 
   await save(record);
+
+  status.innerText = "Berhasil diupdate!";
   loadImages();
 }
 
-// DELETE
+// ================= DELETE =================
 async function deleteImage(index) {
+  const status = document.getElementById("status");
+  status.innerText = "Menghapus gambar...";
+
   const res = await fetch(BIN_URL);
   const data = await res.json();
   const record = data.record;
@@ -115,16 +163,17 @@ async function deleteImage(index) {
 
   record.images.splice(index, 1);
 
-  // FIX BUG: cek current dengan benar
   if (record.current === deletedUrl) {
     record.current = record.images[0] || "";
   }
 
   await save(record);
+
+  status.innerText = "Gambar dihapus!";
   loadImages();
 }
 
-// SAVE
+// ================= SAVE =================
 async function save(record) {
   await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
     method: "PUT",
@@ -136,6 +185,7 @@ async function save(record) {
   });
 }
 
+// ================= INIT =================
 window.onload = loadImages;
 </script>
 
