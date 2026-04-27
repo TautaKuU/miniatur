@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Upload ke IoT</title>
+</head>
+<body>
+  <h2>Upload Gambar ke IoT</h2>
+
+  <input type="file" id="fileInput">
+  <button onclick="upload()">Upload</button>
+
+  <p id="status"></p>
+
+  <script>
+    const API_KEY = "ISI_API_IMGBB_KAMU";
+
+    async function upload() {
+      const file = document.getElementById("fileInput").files[0];
+      if (!file) return alert("Pilih file dulu!");
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+
+        document.getElementById("status").innerText = "Uploading...";
+
+        const res = await fetch("https://api.imgbb.com/1/upload?key=" + API_KEY, {
+          method: "POST",
+          body: new URLSearchParams({
+            image: base64
+          })
+        });
+
+        const data = await res.json();
+        const imageUrl = data.data.url;
+
+        document.getElementById("status").innerText = "Upload berhasil!";
+
+        // update JSON BIN
+        await fetch("https://api.jsonbin.io/v3/b/YOUR_BIN_ID", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": "YOUR_JSONBIN_KEY"
+          },
+          body: JSON.stringify({
+            image: imageUrl
+          })
+        });
+
+        alert("IoT berhasil diupdate!");
+      };
+    }
+  </script>
+</body>
+</html>
